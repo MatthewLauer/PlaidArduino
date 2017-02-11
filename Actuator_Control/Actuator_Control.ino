@@ -3,8 +3,11 @@
 #include <std_msgs/Int8.h>
 #include <math.h>
 
+ros::NodeHandle nh;
+
+
 const int Adec = 4;
-const int BDec = 5;
+const int Bdec = 5;
 const int Cdec = 6;
 const int Enable = 7;
 const int Brake = 8;
@@ -16,7 +19,7 @@ const int DecPow = 12; //not sure if necessary, may prevent partial write to dec
 
 int ActRef, ActPos;
 float curpos;  
-boolean reached;
+boolean reached, refbool;
 
 void ActRefCB( const std_msgs::Int8& msg){
   ActRef = msg.data;
@@ -45,68 +48,116 @@ void setup() {
 
   pinMode(Ref, INPUT);
   pinMode(Ready, INPUT);
-  attachInterrupt(digitalPinToInterrupt(Rec), setReached, RISING);
+  attachInterrupt(0, setReached, RISING);
 
   ActRef = 0;
   ActPos = 0;
   curpos = 0;
   reached = true;
   digitalWrite(Enable, HIGH);
+  refbool = false;
 }
 
 void loop() {
-  if(digitalRead(Ref) == LOW && ActRef == 1 && digitalRead(Ready) = HIGH){
+  if(digitalRead(Ref) == LOW && ActRef == 1){// && digitalRead(Ready) == HIGH){
+    reached = false;
     goHome();
+    curpos = 0;
   }
 
-  if(ActPos != curpos && digitalRead(Ready) == HIGH && digitalRead(Ref) == HIGH){
+  if(ActPos != curpos && digitalRead(Ref) == HIGH){
     reached = false;
     moveToPos();
   }
   
+  if(refbool && digitalRead(Ready) == HIGH){
+    digitalWrite(Enable, LOW);
+    digitalWrite(Reset, HIGH);
+    delay(100);
+    digitalWrite(Enable, HIGH);
+    delay(100);
+    digitalWrite(Reset, LOW);
+  }
+  nh.spinOnce();
 }
 
 void moveToPos(){
-  while(reached = false){
+  while(reached == false){
     if(ActPos - curpos > 0){
       if(ActPos - curpos > 100){ //logarithmic moves in mm (100,10,1)
-        digitalWrite(DecPow, LOW);//values go, 0-5 on dec
         digitalWrite(Adec, LOW);
         digitalWrite(Bdec, LOW);
         digitalWrite(Cdec, LOW);
-        digitalWrite(DecPow, HIGH);        
-      }if(Actpos - curpos > 10){
-        digitalWrite(DecPow, LOW);
+        digitalWrite(DecPow, HIGH);
+        while(reached == false){
+          delay(1000);
+        }
+        curpos = curpos+100;
+        if(ActPos - curpos != 0){
+          reached = false;
+        }        
+      }if(ActPos - curpos > 10){
         digitalWrite(Adec, HIGH);
         digitalWrite(Bdec, LOW);
         digitalWrite(Cdec, LOW);
-        digitalWrite(DecPow, HIGH);        
+        digitalWrite(DecPow, HIGH);
+        while(reached == false){
+          delay(1000);
+        }
+        curpos = curpos+10;
+        if(ActPos - curpos != 0){
+          reached = false;
+        }        
       }else{
-        digitalWrite(DecPow, LOW);
         digitalWrite(Adec, LOW);
         digitalWrite(Bdec, HIGH);
         digitalWrite(Cdec, LOW);
         digitalWrite(DecPow, HIGH);        
+        while(reached == false){
+          delay(1000);
+        }
+        curpos = curpos+1;
+        if(ActPos - curpos != 0){
+          reached = false;
+        }        
       }
     }else if(ActPos - curpos < 0){
-      if(ActPos - pos < -100){ //logarithmic moves in mm (100,10,1)
-        digitalWrite(DecPow, LOW);
+      if(ActPos - curpos < -100){ //logarithmic moves in mm (100,10,1)
         digitalWrite(Adec, HIGH);
         digitalWrite(Bdec, HIGH);
         digitalWrite(Cdec, LOW);
-        digitalWrite(DecPow, HIGH);        
-      }if(Actpos - curpos < -10){
-        digitalWrite(DecPow, LOW);
+        digitalWrite(DecPow, HIGH);
+        while(reached == false){
+          delay(1000);
+        }
+        curpos = curpos-100;
+        if(ActPos - curpos != 0){
+          reached = false;
+        }                
+      }if(ActPos - curpos < -10){
         digitalWrite(Adec, LOW);
         digitalWrite(Bdec, LOW);
         digitalWrite(Cdec, HIGH);
-        digitalWrite(DecPow, HIGH);        
+        digitalWrite(DecPow, HIGH);
+        while(reached == false){
+          delay(1000);
+        }
+        curpos = curpos-10;
+        if(ActPos - curpos != 0){
+          reached = false;
+        }                
       }else{
-        digitalWrite(DecPow, LOW);
         digitalWrite(Adec, HIGH);
         digitalWrite(Bdec, LOW);
         digitalWrite(Cdec, HIGH);
         digitalWrite(DecPow, HIGH);        
+        while(reached == false){
+          delay(1000);
+        }
+        curpos = curpos-1;
+        if(ActPos - curpos != 0){
+          reached = false;
+        }        
       }
     }else{
       return; //This should never happen, it means that we think we reached the goal, but we didn't
@@ -119,15 +170,15 @@ void moveToPos(){
 
 
 void goHome(){
-  while(reached == false){
-    digitalWrite(DecPow, LOW); //value 7 on dec
+  //while(reached == false){
     digitalWrite(Adec, HIGH);
     digitalWrite(Bdec, HIGH);
     digitalWrite(Cdec, HIGH);
     digitalWrite(DecPow, HIGH);
-  }
+  //}
 }
 
 void setReached(){
   reached = true;
+  digitalWrite(DecPow, LOW);
 }
