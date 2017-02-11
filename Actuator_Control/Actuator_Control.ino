@@ -70,6 +70,12 @@ void loop() {
     moveToPos();
   }
   
+  if(digitalRead(Ready) == LOW){
+    digitalWrite(Enable, LOW);
+    delay(100);
+    digitalWrite(Enable, HIGH);
+  }
+  
   if(refbool && digitalRead(Ready) == HIGH){
     digitalWrite(Enable, LOW);
     digitalWrite(Reset, HIGH);
@@ -82,83 +88,83 @@ void loop() {
 }
 
 void moveToPos(){
-  while(reached == false){
+  while(ActPos != curpos){
     if(ActPos - curpos > 0){
-      if(ActPos - curpos > 100){ //logarithmic moves in mm (100,10,1)
+      if(ActPos - curpos >= 100){ //logarithmic moves in mm (100,10,1)
         digitalWrite(Adec, LOW);
         digitalWrite(Bdec, LOW);
         digitalWrite(Cdec, LOW);
         digitalWrite(DecPow, HIGH);
-        while(reached == false){
-          delay(1000);
-        }
         curpos = curpos+100;
+        //while(reached == false){
+          delay(1000);
+        //}
         if(ActPos - curpos != 0){
           reached = false;
         }        
-      }if(ActPos - curpos > 10){
+      }else if(ActPos - curpos >= 10){
         digitalWrite(Adec, HIGH);
         digitalWrite(Bdec, LOW);
         digitalWrite(Cdec, LOW);
         digitalWrite(DecPow, HIGH);
-        while(reached == false){
-          delay(1000);
-        }
         curpos = curpos+10;
+        //while(reached == false){
+          delay(400);
+        //}
         if(ActPos - curpos != 0){
           reached = false;
         }        
-      }else{
+      }/*else{
         digitalWrite(Adec, LOW);
         digitalWrite(Bdec, HIGH);
         digitalWrite(Cdec, LOW);
         digitalWrite(DecPow, HIGH);        
-        while(reached == false){
-          delay(1000);
-        }
         curpos = curpos+1;
+        while(reached == false){
+          delay(10);
+        }
         if(ActPos - curpos != 0){
           reached = false;
         }        
-      }
+      }*/
     }else if(ActPos - curpos < 0){
-      if(ActPos - curpos < -100){ //logarithmic moves in mm (100,10,1)
+      if(ActPos - curpos <= -100){ //logarithmic moves in mm (100,10,1)
         digitalWrite(Adec, HIGH);
         digitalWrite(Bdec, HIGH);
         digitalWrite(Cdec, LOW);
         digitalWrite(DecPow, HIGH);
-        while(reached == false){
-          delay(1000);
-        }
         curpos = curpos-100;
+        //while(reached == false){
+          delay(1000);
+        //}
         if(ActPos - curpos != 0){
           reached = false;
         }                
-      }if(ActPos - curpos < -10){
+      }else if(ActPos - curpos <= -10){
         digitalWrite(Adec, LOW);
         digitalWrite(Bdec, LOW);
         digitalWrite(Cdec, HIGH);
         digitalWrite(DecPow, HIGH);
-        while(reached == false){
-          delay(1000);
-        }
         curpos = curpos-10;
+        //while(reached == false){
+          delay(400);
+        //}
         if(ActPos - curpos != 0){
           reached = false;
         }                
-      }else{
+      }/*else{
         digitalWrite(Adec, HIGH);
         digitalWrite(Bdec, LOW);
         digitalWrite(Cdec, HIGH);
-        digitalWrite(DecPow, HIGH);        
+        digitalWrite(DecPow, HIGH);
+        curpos = curpos-1;        
         while(reached == false){
-          delay(1000);
+          delay(10);
         }
-        curpos = curpos-1;
         if(ActPos - curpos != 0){
           reached = false;
         }        
-      }
+      }*/
     }else{
       return; //This should never happen, it means that we think we reached the goal, but we didn't
     }
