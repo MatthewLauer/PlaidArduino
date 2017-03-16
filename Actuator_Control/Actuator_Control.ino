@@ -19,7 +19,12 @@ const int DecPow = 12; //not sure if necessary, may prevent partial write to dec
 
 int ActRef, ActPos;
 float curpos;  
-boolean reached, refbool;
+boolean refbool;
+boolean reached;
+
+std_msgs::Float32 ActPosFB;
+
+ros::Publisher ActPosFBpub("ActPosFB", &ActPosFB);
 
 void ActRefCB( const std_msgs::Int8& msg){
   ActRef = msg.data;
@@ -28,14 +33,24 @@ ros::Subscriber<std_msgs::Int8> ActRefSub("ActRef", ActRefCB);
 
 void ActPosCB( const std_msgs::Float32& msg){
   ActPos = (int)round(1000*msg.data);
+  if(ActPos > 490){
+    ActPos = 490;
+  }
+  if(ActPos < -490){
+    ActPos = -490;
+  }
 }
 ros::Subscriber<std_msgs::Float32> ActPosSub("ActPos", ActPosCB);
 
 void setup() {
+  //nh.getHardware()->setBaud(115200);
   nh.initNode();
 
   nh.subscribe(ActPosSub);
   nh.subscribe(ActRefSub);
+  nh.advertise(ActPosFBpub);
+  pinMode(13, OUTPUT);
+
 
   pinMode(Adec, OUTPUT);
   pinMode(Bdec, OUTPUT);
@@ -51,8 +66,8 @@ void setup() {
   attachInterrupt(0, setReached, RISING);
 
   ActRef = 0;
-  ActPos = 0;
-  curpos = 0;
+  ActPos = -500;
+  curpos = -1000;
   reached = true;
   digitalWrite(Enable, HIGH);
   refbool = false;
@@ -60,9 +75,11 @@ void setup() {
 
 void loop() {
   if(digitalRead(Ref) == LOW && ActRef == 1){// && digitalRead(Ready) == HIGH){
+    digitalWrite(DecPow, LOW);
     reached = false;
     goHome();
-    curpos = 0;
+    curpos = -500;
+    delay(500);
   }
 
   if(ActPos != curpos && digitalRead(Ref) == HIGH){
@@ -70,21 +87,24 @@ void loop() {
     moveToPos();
   }
   
-  if(digitalRead(Ready) == LOW){
+  /*if(digitalRead(Ready) == LOW){
     digitalWrite(Enable, LOW);
     delay(100);
     digitalWrite(Enable, HIGH);
-  }
+  }*/
   
-  if(refbool && digitalRead(Ready) == HIGH){
+  /*if(refbool && digitalRead(Ready) == HIGH){
     digitalWrite(Enable, LOW);
     digitalWrite(Reset, HIGH);
     delay(100);
     digitalWrite(Enable, HIGH);
     delay(100);
     digitalWrite(Reset, LOW);
-  }
-  nh.spinOnce();
+  }*/
+  nh.spinOnce();  
+  ActPosFB.data = float(curpos)/1000.0;
+  ActPosFBpub.publish(&ActPosFB);
+  delay(50);
 }
 
 void moveToPos(){
@@ -95,25 +115,23 @@ void moveToPos(){
         digitalWrite(Bdec, LOW);
         digitalWrite(Cdec, LOW);
         digitalWrite(DecPow, HIGH);
+        while(reached == false){
+          spinWait(100);
+        }
+        digitalWrite(13, LOW);
+        reached = false;
         curpos = curpos+100;
-        //while(reached == false){
-          delay(1000);
-        //}
-        if(ActPos - curpos != 0){
-          reached = false;
-        }        
       }else if(ActPos - curpos >= 10){
         digitalWrite(Adec, HIGH);
         digitalWrite(Bdec, LOW);
         digitalWrite(Cdec, LOW);
         digitalWrite(DecPow, HIGH);
+        while(reached == false){
+          spinWait(100);
+        }
+        digitalWrite(13, LOW);
+        reached = false;
         curpos = curpos+10;
-        //while(reached == false){
-          delay(400);
-        //}
-        if(ActPos - curpos != 0){
-          reached = false;
-        }        
       }/*else{
         digitalWrite(Adec, LOW);
         digitalWrite(Bdec, HIGH);
@@ -133,25 +151,24 @@ void moveToPos(){
         digitalWrite(Bdec, HIGH);
         digitalWrite(Cdec, LOW);
         digitalWrite(DecPow, HIGH);
+        while(reached == false){
+          spinWait(100);
+        }
+        digitalWrite(13, LOW);
+        reached = false;
         curpos = curpos-100;
-        //while(reached == false){
-          delay(1000);
-        //}
-        if(ActPos - curpos != 0){
-          reached = false;
-        }                
       }else if(ActPos - curpos <= -10){
         digitalWrite(Adec, LOW);
         digitalWrite(Bdec, LOW);
         digitalWrite(Cdec, HIGH);
         digitalWrite(DecPow, HIGH);
+        while(reached == false){
+          spinWait(100);
+        }
+        digitalWrite(13, LOW);
+        reached = false;
         curpos = curpos-10;
-        //while(reached == false){
-          delay(400);
-        //}
-        if(ActPos - curpos != 0){
-          reached = false;
-        }                
+
       }/*else{
         digitalWrite(Adec, HIGH);
         digitalWrite(Bdec, LOW);
@@ -166,14 +183,20 @@ void moveToPos(){
         }        
       }*/
     }else{
-      return; //This should never happen, it means that we think we reached the goal, but we didn't
+      return;
     }
-    
   }
 
   
 }
 
+void spinWait(int time){
+  for(int i = 0; i < time; i++){
+    delay(10);
+    nh.spinOnce();
+  }
+
+}
 
 void goHome(){
   //while(reached == false){
@@ -187,4 +210,7 @@ void goHome(){
 void setReached(){
   reached = true;
   digitalWrite(DecPow, LOW);
+  digitalWrite(13, HIGH);
+  ActPosFB.data = float(curpos)/1000.0;
+  ActPosFBpub.publish(&ActPosFB);
 }
