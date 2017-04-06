@@ -74,12 +74,13 @@ void setup() {
 }
 
 void loop() {
-  if(digitalRead(Ref) == LOW && ActRef == 1){// && digitalRead(Ready) == HIGH){
+  if(refbool == false && ActRef == 1){// && digitalRead(Ready) == HIGH){
     digitalWrite(DecPow, LOW);
     reached = false;
     goHome();
     curpos = -500;
-    delay(500);
+    //delay(500);
+    refbool = true;
   }
 
   if(ActPos != curpos && digitalRead(Ref) == HIGH){
@@ -102,9 +103,9 @@ void loop() {
     digitalWrite(Reset, LOW);
   }*/
   nh.spinOnce();  
-  ActPosFB.data = float(curpos)/1000.0;
-  ActPosFBpub.publish(&ActPosFB);
-  delay(50);
+  //ActPosFB.data = float(curpos)/1000.0;
+  //ActPosFBpub.publish(&ActPosFB);
+  delay(5);
 }
 
 void moveToPos(){

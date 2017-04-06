@@ -1,8 +1,9 @@
-//#include <ros.h>
-//#include <std_msgs/Float32.h>
-//#include <std_msgs/Int8.h>
-//#include <math.h>
+#include <ros.h>
+#include <std_msgs/Float32.h>
+#include <std_msgs/Int8.h>
+#include <math.h>
 
+ros::NodeHandle nh;
 
 //Inputs (11) blue wires
 const int MoCom = 20; //interrupt
@@ -33,7 +34,11 @@ const int Reset = 51;
 int ActRef, ActPos;
 float curpos;  
 boolean reached, refbool, lastadjust;
-/*
+
+std_msgs::Float32 ActPosFB;
+
+ros::Publisher ActPosFBpub("ActPosFB", &ActPosFB);
+
 void ActRefCB( const std_msgs::Int8& msg){
   ActRef = msg.data;
 }
@@ -41,17 +46,27 @@ ros::Subscriber<std_msgs::Int8> ActRefSub("ActRef", ActRefCB);
 
 void ActPosCB( const std_msgs::Float32& msg){
   ActPos = (int)round(1000*msg.data);
+  if(ActPos > 490){
+    ActPos = 490;
+  }
+  if(ActPos < -490){
+    ActPos = -490;
+  }
 }
 ros::Subscriber<std_msgs::Float32> ActPosSub("ActPos", ActPosCB);
-*/
+
 
 void setup() {
+  nh.initNode();
+  nh.subscribe(ActPosSub);
+  nh.subscribe(ActRefSub);
+  nh.advertise(ActPosFBpub);
   // put your setup code here, to run once:
-  int inpins[] = {StAck,Stopped,Moving,Error,Par1,Par2,Zone,Refed,Ready,Torque};
+  int inpins[] = {MoCom, StAck,Stopped,Moving,Error,Par1,Par2,Zone,Refed,Ready,Torque};
   for (int i = 0; i < (sizeof(inpins)/sizeof(int)); i++){
     pinMode(inpins[i], INPUT);
   }
-  attachInterrupt(3, MoveComplete, RISING); //interrupt hardocded
+  //attachInterrupt(3, MoveComplete, RISING); //interrupt hardocded
 
   int outpins[] = {Rec0, Rec1, Rec2, Rec3, Rec4, Start, Pause, Mode, Brake, Enable, Reset};
   for (int i = 0; i < (sizeof(outpins)/sizeof(int)); i++){
@@ -64,7 +79,6 @@ void setup() {
   ActPos = -1000;
   curpos = -1000;
   reached = true;
-  digitalWrite(Enable, HIGH);
   refbool = false;
   lastadjust = false;
 }
@@ -72,6 +86,14 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   if(ActRef == 1 && refbool == false){
+    reached = false;
+    nh.spinOnce(); 
+    digitalWrite(Pause, LOW);
+    delay(5000);
+    nh.spinOnce(); 
+    digitalWrite(Enable, LOW);
+    delay(5000);
+    nh.spinOnce(); 
     executeRecord(0);
     refbool = true;
   }
@@ -80,7 +102,10 @@ void loop() {
     reached = false;
     executeMove();
   }
- //spin 
+  nh.spinOnce();  
+  ActPosFB.data = float(curpos)/1000.0;
+  ActPosFBpub.publish(&ActPosFB);
+  delay(50);
 }
 
 void executeMove(){
@@ -129,12 +154,10 @@ void executeRecord(int rec){ //We are active LOW
     digitalWrite(Rec0, LOW);
   }
   digitalWrite(Start, LOW);
-  while(reached == false){
-    //spin
+  delay(50);
+  while(digitalRead(MoCom) == LOW){
+      nh.spinOnce();  
   }
-}
-
-void MoveComplete(){
   reached = true;
   int outpins[] = {Rec0, Rec1, Rec2, Rec3, Rec4, Start};
   for (int i = 0; i < (sizeof(outpins)/sizeof(int)); i++){
@@ -142,3 +165,11 @@ void MoveComplete(){
   }
 }
 
+/*void MoveComplete(){
+  reached = true;
+  int outpins[] = {Rec0, Rec1, Rec2, Rec3, Rec4, Start};
+  for (int i = 0; i < (sizeof(outpins)/sizeof(int)); i++){
+    digitalWrite(outpins[i], HIGH); //We are active LOW
+  }
+}
+*/
